@@ -33,7 +33,6 @@ import dev.omalauncher.widgets.market.Shared
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import dev.omalauncher.ui.BracketAction
 import dev.omalauncher.ui.CodeBlock
 import dev.omalauncher.ui.Mono
 import dev.omalauncher.ui.OverlayPanel
@@ -80,6 +79,8 @@ fun SharedWidgetScreen(
             return@OverlayPanel
         }
         val p = shared.program
+        // Review.risks over every command, once per shared widget rather than once per call site below.
+        val risks = remember(shared) { shared.risks }
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             BasicText(shared.name.ifEmpty { stringResource(if (app) R.string.store_shared_unnamed_app else R.string.store_shared_unnamed_widget) }, style = Mono.copy(fontSize = TextSize.Title))
             if (p != null) {
@@ -104,14 +105,16 @@ fun SharedWidgetScreen(
                     when (same) {
                         true -> AddedMark(kind)
                         false ->
-                            BracketAction(stringResource(R.string.store_shared_replace, shared.name), Palette.accent) {
+                            // Review.risks runs on these same commands; a risky one gets a second confirm (RiskyAction, StoreScreen.kt)
+                            // before it replaces what's there, same as a fresh add below.
+                            RiskyAction(stringResource(R.string.store_shared_replace, shared.name), Palette.accent, risks = risks) {
                                 scope.launch {
                                     engine.addSharedWidget(shared, page)
                                     onDismiss()
                                 }
                             }
                         null ->
-                            BracketAction(
+                            RiskyAction(
                                 when (kind) {
                                     OwlKind.App -> stringResource(R.string.store_add_to_drawer)
                                     OwlKind.Face -> stringResource(R.string.store_add_as_face)
@@ -120,6 +123,7 @@ fun SharedWidgetScreen(
                                     OwlKind.Keybar, OwlKind.Strip -> stringResource(R.string.store_add_to_widgets_folder)
                                 },
                                 Palette.accent,
+                                risks = risks,
                             ) {
                                 scope.launch {
                                     engine.addSharedWidget(shared, page)
@@ -133,7 +137,7 @@ fun SharedWidgetScreen(
 
             if (p != null) {
                 Spacer(Modifier.height(4.dp))
-                for (risk in shared.risks) BasicText("⚠ $risk", style = Mono.copy(color = Palette.red, fontSize = TextSize.Small))
+                for (risk in risks) BasicText("⚠ $risk", style = Mono.copy(color = Palette.red, fontSize = TextSize.Small))
                 InstallDisclosure(shared.requires, shared.commands)
             }
 
